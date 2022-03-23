@@ -14,7 +14,7 @@
                 "-E",
                 "-i",
                 "eval",
-                "./..."
+                "./src/integrations/amazonsns/..."
             ],
             "cwd": "/home/kevin/work/live/opsgenie"
         }

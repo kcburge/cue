@@ -83,11 +83,7 @@ func getLang() language.Tag {
 	return language.Make(loc)
 }
 
-func exitOnErr(cmd *Command, err error, fatal bool) {
-	if err == nil {
-		return
-	}
-
+func printError(cmd *Command, err error) {
 	// Link x/text as our localizer.
 	p := message.NewPrinter(getLang())
 	format := func(w io.Writer, format string, args ...interface{}) {
@@ -105,6 +101,15 @@ func exitOnErr(cmd *Command, err error, fatal bool) {
 
 	b := w.Bytes()
 	_, _ = cmd.Stderr().Write(b)
+}
+
+func exitOnErr(cmd *Command, err error, fatal bool) {
+	if err == nil {
+		return
+	}
+
+	printError(cmd, err)
+
 	if fatal {
 		exit()
 	}
@@ -498,7 +503,7 @@ func (p *buildPlan) getDecoders(b *build.Instance) (schemas, values []*decoderIn
 		}
 		switch {
 		// case !fi.Schema: // TODO: value/schema/auto
-		// 	values = append(values, d)
+		//	values = append(values, d)
 		case fi.Form != build.Schema && fi.Form != build.Final:
 			values = append(values, &decoderInfo{f, d})
 
@@ -735,11 +740,20 @@ func buildInstances(cmd *Command, binst []*build.Instance, ignoreErrors bool) []
 	// TODO:
 	// If there are no files and User is true, then use those?
 	// Always use all files in user mode?
+	var err error
+
 	instances := cue.Build(binst)
 	for _, inst := range instances {
 		// TODO: consider merging errors of multiple files, but ensure
 		// duplicates are removed.
-		exitIfErr(cmd, inst, inst.Err, true)
+		if inst.Err != nil {
+			err = inst.Err
+			//exitIfErr(cmd, inst, inst.Err, true)
+			printError(cmd, inst.Err)
+		}
+	}
+	if !ignoreErrors && err != nil {
+		exitIfErr(cmd, nil, err, true)
 	}
 
 	// TODO: remove ignoreErrors flag and always return here, leaving it up to
