@@ -178,6 +178,27 @@ func (l *loader) importPkg(pos token.Pos, p *build.Instance) []*build.Instance {
 				case 0:
 				case os.ModeDir:
 					continue
+				case os.ModeSymlink:
+					l, err := os.Stat(f.Name())
+					if err != nil {
+						p.UnknownFiles = append(p.UnknownFiles, &build.File{
+							Filename:      f.Name(),
+							ExcludeReason: errors.Newf(token.NoPos, "bad link"),
+						})
+						continue // skip bad symlinks
+					}
+
+					switch lmode := l.Mode(); lmode & os.ModeType {
+					case 0:
+					case os.ModeDir:
+						continue
+					default:
+						p.UnknownFiles = append(p.UnknownFiles, &build.File{
+							Filename:      f.Name(),
+							ExcludeReason: errors.Newf(token.NoPos, "unknown file %d", lmode),
+						})
+					}
+
 				default:
 					p.UnknownFiles = append(p.UnknownFiles, &build.File{
 						Filename:      f.Name(),
