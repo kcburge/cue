@@ -179,13 +179,14 @@ func (l *loader) importPkg(pos token.Pos, p *build.Instance) []*build.Instance {
 				case os.ModeDir:
 					continue
 				case os.ModeSymlink:
-					l, err := os.Stat(f.Name())
+					fp := filepath.Join(dirs[0][1], f.Name())
+					l, err := os.Stat(fp)
 					if err != nil {
-						p.UnknownFiles = append(p.UnknownFiles, &build.File{
-							Filename:      f.Name(),
-							ExcludeReason: errors.Newf(token.NoPos, "bad link"),
-						})
-						continue // skip bad symlinks
+						if os.IsNotExist(err) {
+							continue // skip symlinks to nowhere
+						}
+
+						return retErr(errors.Wrapf(err, pos, "import failed reading symlink"))
 					}
 
 					switch lmode := l.Mode(); lmode & os.ModeType {
