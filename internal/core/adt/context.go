@@ -39,7 +39,7 @@ var Debug bool = os.Getenv("CUE_DEBUG") != "0"
 // Verbosity sets the log level. There are currently only two levels:
 //   0: no logging
 //   1: logging
-var Verbosity int
+var Verbosity int = 1
 
 // DebugSort specifies that arcs be sorted consistently between implementations.
 // 0: default

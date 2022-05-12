@@ -15,6 +15,7 @@
 package compile
 
 import (
+	"fmt"
 	"strings"
 
 	"cuelang.org/go/cue/ast"
@@ -24,6 +25,7 @@ import (
 	"cuelang.org/go/internal"
 	"cuelang.org/go/internal/astinternal"
 	"cuelang.org/go/internal/core/adt"
+	"cuelang.org/go/internal/core/debug"
 )
 
 // A Scope represents a nested scope of Vertices.
@@ -280,6 +282,8 @@ func (c *compiler) compileFiles(a []*ast.File) *adt.Vertex { // Or value?
 	}
 
 	for _, file := range a {
+		fmt.Println(astinternal.DebugStr(file))
+
 		c.pushScope(nil, 0, file) // File scope
 		v := &adt.StructLit{Src: file}
 		c.addDecls(v, file.Decls)
@@ -287,6 +291,8 @@ func (c *compiler) compileFiles(a []*ast.File) *adt.Vertex { // Or value?
 		c.popScope()
 	}
 
+	fmt.Println("===============")
+	fmt.Println(debug.NodeString(c.index, res, &debug.Config{Raw: false, Compact: false}))
 	return res
 }
 
@@ -959,6 +965,7 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 			d := &adt.DisjunctionExpr{Src: n}
 			c.addDisjunctionElem(d, n.X, false)
 			c.addDisjunctionElem(d, n.Y, false)
+
 			return d
 
 		default:
