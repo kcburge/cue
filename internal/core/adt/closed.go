@@ -20,7 +20,7 @@ package adt
 //
 // To compute closedness each Vertex is associated with a tree which has
 // leaf nodes with sets of allowed labels, and interior nodes that describe
-// how these sets may be combines: Or, for embedding, or And for definitions.
+// how these sets may be combined: Or, for embedding, or And for definitions.
 //
 // Each conjunct of a Vertex is associated with such a leaf node. Each
 // conjunct that evaluates to a struct is added to the list of Structs, which
