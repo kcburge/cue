@@ -98,7 +98,7 @@ func FromFile(b *build.File, mode Mode) (*FileInfo, error) {
 
 	i := cuegenInstance.Value()
 	i, errs := update(nil, i, i, "modes", mode.String())
-	v := i.LookupDef("FileInfo")
+	v := i.LookupPath(cue.MakePath(cue.Def("FileInfo")))
 	v = v.Fill(b)
 
 	if b.Encoding == "" {
@@ -258,7 +258,7 @@ func toFile(i, v cue.Value, filename string) (*build.File, error) {
 	if concrete, hasDefault := hasEncoding(v); !concrete {
 		if filename == "-" {
 			if !hasDefault {
-				v = v.Unify(i.LookupDef("Default"))
+				v = v.Unify(i.LookupPath(cue.MakePath(cue.Def("Default"))))
 			}
 		} else if ext := filepath.Ext(filename); ext != "" {
 			if x := i.Lookup("extensions", ext); x.Exists() || !hasDefault {
@@ -285,7 +285,7 @@ func toFile(i, v cue.Value, filename string) (*build.File, error) {
 func parseType(s string, mode Mode) (inst, val cue.Value, err error) {
 	i := cuegenInstance.Value()
 	i = i.Unify(i.Lookup("modes", mode.String()))
-	v := i.LookupDef("File")
+	v := i.LookupPath(cue.MakePath(cue.Def("File")))
 
 	if s != "" {
 		for _, t := range strings.Split(s, "+") {

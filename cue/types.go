@@ -1538,13 +1538,6 @@ func appendPath(a []Selector, v Value) []Selector {
 	return append(a, Selector{sel})
 }
 
-// LookupDef is equal to LookupPath(MakePath(Def(name))).
-//
-// Deprecated: use LookupPath.
-func (v hiddenValue) LookupDef(name string) Value {
-	return v.LookupPath(MakePath(Def(name)))
-}
-
 var errNotFound = errors.Newf(token.NoPos, "field not found")
 
 // FieldByName looks up a field for the given name. If isIdent is true, it will

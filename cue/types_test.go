@@ -1589,7 +1589,7 @@ func TestValue_LookupDef(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.def, func(t *testing.T) {
 			v := compileT(t, r, tc.in).Value()
-			v = v.LookupDef(tc.def)
+			v = v.LookupPath(MakePath(Def(tc.def)))
 			got := fmt.Sprint(v)
 
 			if got != tc.out {

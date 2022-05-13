@@ -301,7 +301,7 @@ func (inst *hiddenInstance) Lookup(path ...string) Value {
 //
 // Deprecated: use Value.LookupPath
 func (inst *hiddenInstance) LookupDef(path string) Value {
-	return inst.value().LookupDef(path)
+	return inst.value().LookupPath(MakePath(Def(path)))
 }
 
 // LookupField reports a Field at a path starting from v, or an error if the
