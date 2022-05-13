@@ -19,7 +19,7 @@ import (
 	"cuelang.org/go/cue/token"
 )
 
-// Nodes man not reenter a disjunction.
+// Nodes may not reenter a disjunction.
 //
 // Copy one layer deep; throw away items on failure.
 

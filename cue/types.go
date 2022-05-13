@@ -33,6 +33,7 @@ import (
 	"cuelang.org/go/internal/core/adt"
 	"cuelang.org/go/internal/core/compile"
 	"cuelang.org/go/internal/core/convert"
+	"cuelang.org/go/internal/core/debug"
 	"cuelang.org/go/internal/core/eval"
 	"cuelang.org/go/internal/core/export"
 	"cuelang.org/go/internal/core/runtime"
@@ -622,6 +623,9 @@ func newErrValue(v Value, b *adt.Bottom) Value {
 
 func newVertexRoot(idx *runtime.Runtime, ctx *adt.OpContext, x *adt.Vertex) Value {
 	if ctx != nil {
+		fmt.Println("===============")
+		fmt.Println(debug.NodeString(idx, x, &debug.Config{Raw: false, Compact: false}))
+
 		// This is indicative of an zero Value. In some cases this is called
 		// with an error value.
 		x.Finalize(ctx)

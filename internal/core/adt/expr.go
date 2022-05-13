@@ -153,6 +153,7 @@ func (o *StructLit) Init() {
 }
 
 func (o *StructLit) fieldIndex(f Feature) int {
+	// TODO: this should use a map for faster lookup
 	for i := range o.Fields {
 		if o.Fields[i].Label == f {
 			return i

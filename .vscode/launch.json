@@ -1,0 +1,140 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "mcue",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/mcue",
+            "args": []
+        },
+        {
+            "name": "Test",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/cue",
+            "args": [
+                "eval",
+                "./..."
+            ],
+            "cwd": "/home/kevin/tmp/cue"
+        },
+        {
+            "name": "Debug OpsGenie",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/cue",
+            "args": [
+                "-E",
+                "-i",
+                "eval",
+                "./src/integrations/amazonsns/..."
+            ],
+            "cwd": "/home/kevin/work/live/opsgenie"
+        },
+        {
+            "name": "Debug Vet",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/cue",
+            "args": [
+                "vet",
+                "-c",
+                "./event/cloudwatch",
+                "-d",
+                "#LambdaEvent",
+                "../tests/cw-rds-free.json"
+            ],
+            "cwd": "/home/kevin/work/live/prod2/modules/tf_module_func_opsgenie_notify/src",
+            "env": {
+                "CUE_DEBUG": "1"
+            }
+        },
+        {
+            "name": "Debug Eval",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/cue",
+            "args": [
+                "eval"
+            ],
+            "cwd": "/home/kevin/work/live/prod2/modules/tf_module_func_opsgenie_notify/src",
+            "env": {
+                "CUE_DEBUG": "1"
+            }
+        },
+        {
+            "name": "Debug Transform",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/cue",
+            "args": [
+                "cmd",
+                "-t",
+                "input=../tests/aps.json",
+                "-t",
+                "schema=aps",
+                "transform",
+                "./..."
+            ],
+            "cwd": "/home/kevin/work/live/prod2/modules/tf_module_func_opsgenie_notify/src",
+            "env": {
+                "CUE_DEBUG": "1"
+            }
+        },
+        {
+            "name": "Debug Symlink",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/cue",
+            "args": [
+                "fmt",
+                "../xxx.cue"
+            ],
+            "cwd": "/home/kevin/Source/cuebugs/test/src",
+            "env": {
+                "CUE_DEBUG": "1"
+            }
+        },
+        {
+            "name": "Debug rdir",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/cue",
+            "args": [
+                "eval",
+                "./..."
+            ],
+            "cwd": "/home/kevin/Source/cuebugs/rdir",
+            "env": {
+                "CUE_DEBUG": "1"
+            }
+        },
+        {
+            "name": "Debug disjun",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/cue",
+            "args": [
+                "eval",
+                "broken1.cue"
+            ],
+            "cwd": "/home/kevin/Source/cuebugs/disjun",
+            "env": {
+                "CUE_DEBUG": "1"
+            }
+        }
+    ]
+}

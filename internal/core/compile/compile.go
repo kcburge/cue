@@ -25,7 +25,6 @@ import (
 	"cuelang.org/go/internal"
 	"cuelang.org/go/internal/astinternal"
 	"cuelang.org/go/internal/core/adt"
-	"cuelang.org/go/internal/core/debug"
 )
 
 // A Scope represents a nested scope of Vertices.
@@ -291,8 +290,6 @@ func (c *compiler) compileFiles(a []*ast.File) *adt.Vertex { // Or value?
 		c.popScope()
 	}
 
-	fmt.Println("===============")
-	fmt.Println(debug.NodeString(c.index, res, &debug.Config{Raw: false, Compact: false}))
 	return res
 }
 

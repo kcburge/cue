@@ -111,6 +111,8 @@ var incompleteSentinel = &Bottom{
 //
 // TODO: return *Vertex
 func (c *OpContext) evaluate(v *Vertex, state VertexStatus) Value {
+	fmt.Println("OpContext.evaluate")
+
 	if v.isUndefined() {
 		// Use node itself to allow for cycle detection.
 		c.Unify(v, state)
@@ -165,6 +167,7 @@ func (c *OpContext) evaluate(v *Vertex, state VertexStatus) Value {
 // the result in the Vertex. If unify was called on v before it returns
 // the cached results.
 func (c *OpContext) Unify(v *Vertex, state VertexStatus) {
+	fmt.Println("OpContext.Unify")
 	// defer c.PopVertex(c.PushVertex(v))
 	if Debug {
 		c.nest++
@@ -377,6 +380,8 @@ func (c *OpContext) Unify(v *Vertex, state VertexStatus) {
 
 // insertConjuncts inserts conjuncts previously uninserted.
 func (n *nodeContext) insertConjuncts() {
+	fmt.Println("nodeContext.insertConjuncts")
+
 	for len(n.conjuncts) > 0 {
 		nInfos := len(n.node.Structs)
 		p := &n.conjuncts[0]
@@ -398,6 +403,8 @@ func (n *nodeContext) insertConjuncts() {
 // collected during the finalization state of individual disjuncts. Care should
 // be taken to only call this after all disjuncts have been finalized.
 func (n *nodeContext) finalizeDisjuncts() {
+	fmt.Println("nodeContext.finalizeDisjuncts")
+
 	a := n.disjuncts
 	if len(a) == 0 {
 		return
@@ -422,6 +429,8 @@ func (n *nodeContext) finalizeDisjuncts() {
 }
 
 func (n *nodeContext) doNotify() {
+	fmt.Println("nodeContext.doNotify")
+
 	if n.errs == nil || len(n.notify) == 0 {
 		return
 	}
@@ -440,6 +449,8 @@ func (n *nodeContext) doNotify() {
 }
 
 func (n *nodeContext) postDisjunct(state VertexStatus) {
+	fmt.Println("nodeContext.postDisjunct")
+
 	ctx := n.ctx
 
 	for {
@@ -583,6 +594,8 @@ func (n *nodeContext) postDisjunct(state VertexStatus) {
 }
 
 func (n *nodeContext) incompleteErrors() *Bottom {
+	fmt.Println("nodeContext.incompleteErrors")
+
 	// collect incomplete errors.
 	var err *Bottom // n.incomplete
 	for _, d := range n.dynamicFields {
@@ -620,6 +633,8 @@ func (n *nodeContext) incompleteErrors() *Bottom {
 // though, that any potential performance issues are eliminated for
 // Protobuf-like oneOf fields.
 func (n *nodeContext) checkClosed(state VertexStatus) bool {
+	fmt.Println("nodeContext.checkClosed")
+
 	ignore := state != Finalized || n.skipNonMonotonicChecks()
 
 	v := n.node
@@ -639,6 +654,8 @@ func (n *nodeContext) checkClosed(state VertexStatus) bool {
 }
 
 func (n *nodeContext) completeArcs(state VertexStatus) {
+	fmt.Println("nodeContext.completeArcs")
+
 	if DebugSort > 0 {
 		DebugSortArcs(n.ctx, n.node)
 	}
@@ -715,6 +732,8 @@ func isCyclePlaceholder(v BaseValue) bool {
 }
 
 func (n *nodeContext) createDisjunct() *Disjunction {
+	fmt.Println("nodeContext.createDisjunct")
+
 	a := make([]*Vertex, len(n.disjuncts))
 	p := 0
 	hasDefaults := false
@@ -1091,6 +1110,8 @@ func (n *nodeContext) done() bool {
 // finalDone is like done, but allows for cycle errors, which can be ignored
 // as they essentially indicate a = a & _.
 func (n *nodeContext) finalDone() bool {
+	fmt.Println("nodeContext.finalDone")
+
 	for _, x := range n.exprs {
 		if x.err.Code != CycleError {
 			return false
@@ -1118,6 +1139,8 @@ func (n *nodeContext) getErr() *Bottom {
 
 // getValidators sets the vertex' Value in case there was no concrete value.
 func (n *nodeContext) getValidators() BaseValue {
+	fmt.Println("nodeContext.getValidators")
+
 	ctx := n.ctx
 
 	a := []Value{}
@@ -1223,6 +1246,8 @@ func (n *nodeContext) addErr(err errors.Error) {
 // into the nodeContext if successful or queue it for later evaluation if it is
 // incomplete or is not value.
 func (n *nodeContext) addExprConjunct(v Conjunct) {
+	fmt.Println("nodeContext.addExprConjunct")
+
 	env := v.Env
 	id := v.CloseInfo
 
@@ -1271,6 +1296,8 @@ func (n *nodeContext) addExprConjunct(v Conjunct) {
 // evalExpr is only called by addExprConjunct. If an error occurs, it records
 // the error in n and returns nil.
 func (n *nodeContext) evalExpr(v Conjunct) {
+	fmt.Println("nodeContext.evalExpr")
+
 	// Require an Environment.
 	ctx := n.ctx
 
@@ -1348,6 +1375,8 @@ func (n *nodeContext) evalExpr(v Conjunct) {
 }
 
 func (n *nodeContext) addVertexConjuncts(c Conjunct, arc *Vertex, inline bool) {
+	fmt.Println("nodeContext.addVertexConjuncts")
+
 	closeInfo := c.CloseInfo
 
 	// We need to ensure that each arc is only unified once (or at least) a
@@ -1532,6 +1561,8 @@ func updateCyclic(c Conjunct, cyclic bool, deref *Vertex, a []*Vertex) Conjunct 
 }
 
 func (n *nodeContext) addValueConjunct(env *Environment, v Value, id CloseInfo) {
+	fmt.Println("nodeContext.addValueConjunct")
+
 	n.updateCyclicStatus(env)
 
 	ctx := n.ctx
@@ -1753,6 +1784,7 @@ func (n *nodeContext) addStruct(
 	env *Environment,
 	s *StructLit,
 	closeInfo CloseInfo) {
+	fmt.Println("nodeContext.addStruct")
 
 	n.updateCyclicStatus(env) // to handle empty structs.
 
@@ -1851,6 +1883,8 @@ func (n *nodeContext) addStruct(
 // possible as it is not necessary to evaluate optional arcs to evaluate
 // disjunctions.
 func (n *nodeContext) insertField(f Feature, x Conjunct) *Vertex {
+	fmt.Println("nodeContext.insertField")
+
 	ctx := n.ctx
 	arc, _ := n.node.GetArc(ctx, f)
 
@@ -1940,6 +1974,8 @@ func (n *nodeContext) expandOne() (done bool) {
 
 // injectDynamic evaluates and inserts dynamic declarations.
 func (n *nodeContext) injectDynamic() (progress bool) {
+	fmt.Println("nodeContext.injectDynamic")
+
 	ctx := n.ctx
 	k := 0
 
@@ -1985,6 +2021,8 @@ func (n *nodeContext) injectDynamic() (progress bool) {
 // TODO(embeddedScalars): for embedded scalars, there should be another pass
 // of evaluation expressions after expanding lists.
 func (n *nodeContext) addLists() (oneOfTheLists Expr, anID CloseInfo) {
+	fmt.Println("nodeContext.addLists")
+
 	if len(n.lists) == 0 && len(n.vLists) == 0 {
 		return nil, CloseInfo{}
 	}
