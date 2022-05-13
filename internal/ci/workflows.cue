@@ -81,6 +81,7 @@ test: _#bashWorkflow & {
 				},
 				_#goGenerate,
 				_#goTest,
+				_#goCheck,
 				_#goTestRace & {
 					if: "${{ matrix.go-version == '\(_#latestStableGo)' && matrix.os == '\(_#linuxMachine)' }}"
 				},
@@ -326,12 +327,6 @@ _#bashWorkflow: json.#Workflow & {
 _#job:  ((json.#Workflow & {}).jobs & {x: _}).x
 _#step: ((_#job & {steps:                 _}).steps & [_])[0]
 
-// We use the oldest supported Go version for code generation.
-// TODO(mvdan): now that we don't use qgo via go:generate,
-// we should try to use latestStableGo for code generation,
-// which is closer to how developers will run go generate.
-_#codeGenGo: "1.16.x"
-
 // Use the latest Go version for extra checks,
 // such as running tests with the data race detector.
 _#latestStableGo: "1.18.x"
@@ -348,7 +343,7 @@ _#windowsMachine: "windows-2022"
 _#testStrategy: {
 	"fail-fast": false
 	matrix: {
-		"go-version": [_#codeGenGo, "1.17.x", _#latestStableGo]
+		"go-version": ["1.17.x", _#latestStableGo]
 		os: [_#linuxMachine, _#macosMachine, _#windowsMachine]
 	}
 }
@@ -404,12 +399,24 @@ _#goGenerate: _#step & {
 	run:  "go generate ./..."
 	// The Go version corresponds to the precise version specified in
 	// the matrix. Skip windows for now until we work out why re-gen is flaky
-	if: "matrix.go-version == '\(_#codeGenGo)' && matrix.os == '\(_#linuxMachine)'"
+	if: "matrix.go-version == '\(_#latestStableGo)' && matrix.os == '\(_#linuxMachine)'"
 }
 
 _#goTest: _#step & {
 	name: "Test"
 	run:  "go test ./..."
+}
+
+_#goCheck: _#step & {
+	// These checks can vary between platforms, as different code can be built
+	// based on GOOS and GOARCH build tags.
+	// However, CUE does not have any such build tags yet, and we don't use
+	// dependencies that vary wildly between platforms.
+	// For now, to save CI resources, just run the checks on one matrix job.
+	// TODO: consider adding more checks as per https://github.com/golang/go/issues/42119.
+	if: "matrix.go-version == '\(_#latestStableGo)' && matrix.os == '\(_#linuxMachine)'"
+	name: "Check"
+	run:  "go vet ./..."
 }
 
 _#goTestRace: _#step & {

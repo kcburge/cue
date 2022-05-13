@@ -16,6 +16,7 @@ package cmd
 
 import (
 	"bytes"
+	"embed"
 	"fmt"
 	"go/ast"
 	"go/token"
@@ -285,7 +286,8 @@ module cuelang.org/go
 go 1.14
 `
 
-//go:generate go run cuelang.org/go/internal/cmd/embedpkg cuelang.org/go/cmd/cue/cmd/interfaces
+//go:embed interfaces/*.go
+var interfacesFS embed.FS
 
 func initInterfaces() (err error) {
 	// tempdir needed for overlay
@@ -307,35 +309,45 @@ func initInterfaces() (err error) {
 		return err
 	}
 
-	for fn, contents := range interfacesFiles {
-		fn = filepath.Join(tmpDir, filepath.FromSlash(fn))
+	entries, err := interfacesFS.ReadDir("interfaces")
+	if err != nil {
+		return err
+	}
+	localPkgPath := "cmd/cue/cmd/interfaces"
+	fullPkgPath := "cuelang.org/go/" + localPkgPath
+	for _, entry := range entries {
+		name := entry.Name()
+
+		fn := filepath.Join(tmpDir, filepath.FromSlash(localPkgPath), name)
 		dir := filepath.Dir(fn)
 		if err := os.MkdirAll(dir, 0777); err != nil {
 			return err
 		}
+		contents, err := interfacesFS.ReadFile(path.Join("interfaces", name))
+		if err != nil {
+			return err
+		}
 
-		if err = ioutil.WriteFile(fn, contents, 0666); err != nil {
+		if err := ioutil.WriteFile(fn, contents, 0666); err != nil {
 			return err
 		}
 	}
 
 	cfg := &packages.Config{
-		Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles |
-			packages.NeedImports | packages.NeedTypes | packages.NeedTypesSizes |
-			packages.NeedSyntax | packages.NeedTypesInfo | packages.NeedDeps,
-		Dir: filepath.Join(tmpDir),
+		Mode: packages.NeedTypes | packages.NeedTypesInfo,
+		Dir:  filepath.Join(tmpDir),
 	}
 
-	p, err := packages.Load(cfg, "cuelang.org/go/cmd/cue/cmd/interfaces")
+	p, err := packages.Load(cfg, fullPkgPath)
 	if err != nil {
-		return fmt.Errorf("error loading embedded cuelang.org/go/cmd/cue/cmd/interfaces package: %w", err)
+		return fmt.Errorf("error loading embedded %s package: %w", fullPkgPath, err)
 	}
 	if len(p[0].Errors) > 0 {
 		var buf bytes.Buffer
 		for _, e := range p[0].Errors {
 			fmt.Fprintf(&buf, "\t%v\n", e)
 		}
-		return fmt.Errorf("error loading embedded cuelang.org/go/cmd/cue/cmd/interfaces package:\n%s", buf.String())
+		return fmt.Errorf("error loading embedded %s package:\n%s", fullPkgPath, buf.String())
 	}
 
 	for e, tt := range p[0].TypesInfo.Types {
@@ -390,9 +402,9 @@ func extract(cmd *Command, args []string) error {
 	root := binst.Root
 
 	cfg := &packages.Config{
-		Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles |
-			packages.NeedImports | packages.NeedTypes | packages.NeedTypesSizes |
-			packages.NeedSyntax | packages.NeedTypesInfo | packages.NeedDeps |
+		Mode: packages.NeedName | packages.NeedCompiledGoFiles |
+			packages.NeedImports | packages.NeedTypes |
+			packages.NeedSyntax | packages.NeedTypesInfo |
 			packages.NeedModule,
 	}
 	pkgs, err := packages.Load(cfg, args...)
@@ -580,6 +592,9 @@ func (e *extractor) importCUEFiles(p *packages.Package, dir, args string) error 
 	for _, o := range p.CompiledGoFiles {
 		root := filepath.Dir(o)
 		err := filepath.Walk(root, func(path string, fi os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
 			if fi.IsDir() && path != root {
 				return filepath.SkipDir
 			}
@@ -795,7 +810,7 @@ func (e *extractor) reportDecl(x *ast.GenDecl) (a []cueast.Decl) {
 					panic(fmt.Errorf("failed to parse %v: %v", sv, err))
 				}
 
-				// Use orignal Go value if compatible with CUE (octal is okay)
+				// Use the original Go value if compatible with CUE (octal is okay)
 				if b, ok := cv.(*cueast.BasicLit); ok {
 					if b.Kind == cuetoken.INT && val != "" && val[0] != '\'' {
 						b.Value = val
