@@ -1,0 +1,16 @@
+# TODO: error message could be improved.
+
+! exec cue import test.yaml -p kube -l 'strings.ToCamel(kind)' -l metadata.name -f
+cmp stderr expect-stderr
+
+-- test.yaml --
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-nginx
+spec:
+  type: NodePort
+---
+# EMPTY FILE
+-- expect-stderr --
+error evaluating label strings.ToCamel(kind): reference "kind" not found

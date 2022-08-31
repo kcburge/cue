@@ -30,20 +30,19 @@ import (
 //
 // A function may return and a constant may be any of the following types:
 //
-//   error (translates to bottom)
-//   nil   (translates to null)
-//   bool
-//   int*
-//   uint*
-//   float64
-//   string
-//   *big.Float
-//   *big.Int
+//	error (translates to bottom)
+//	nil   (translates to null)
+//	bool
+//	int*
+//	uint*
+//	float64
+//	string
+//	*big.Float
+//	*big.Int
 //
-//   For any of the above, including interface{} and these types recursively:
-//   []T
-//   map[string]T
-//
+//	For any of the above, including interface{} and these types recursively:
+//	[]T
+//	map[string]T
 type Builtin struct {
 	Name   string
 	Pkg    adt.Feature
@@ -75,9 +74,11 @@ func (p *Package) MustCompile(ctx *adt.OpContext, importPath string) *adt.Vertex
 
 		f := ctx.StringLabel(b.Name) // never starts with _
 		// n := &node{baseValue: newBase(imp.Path)}
-		var v adt.Expr = toBuiltin(ctx, b)
+		var v adt.Expr
 		if b.Const != "" {
 			v = mustParseConstBuiltin(ctx, b.Name, b.Const)
+		} else {
+			v = toBuiltin(ctx, b)
 		}
 		st.Decls = append(st.Decls, &adt.Field{
 			Label: f,

@@ -64,7 +64,7 @@ func TestAPI(t *testing.T) {
 			res := runSpec.Unify(v)
 			return res
 		},
-		want: "_|_ // #runSpec: field not allowed: ction",
+		want: "_|_ // #runSpec.ction: field not allowed",
 	}, {
 		// Issue #567
 		input: `
@@ -78,7 +78,7 @@ func TestAPI(t *testing.T) {
 			res := runSpec.Unify(v)
 			return res
 		},
-		want: "_|_ // #runSpec.action: field not allowed: Foo",
+		want: "_|_ // #runSpec.action.Foo: field not allowed",
 	}, {
 		input: `
 		#runSpec: v: {action: foo: int}
@@ -92,7 +92,7 @@ func TestAPI(t *testing.T) {
 			res := w.Unify(v)
 			return res
 		},
-		want: "_|_ // w: field not allowed: ction",
+		want: "_|_ // w.ction: field not allowed",
 	}}
 	for _, tc := range testCases {
 		if tc.skip {
@@ -986,8 +986,8 @@ func TestFill(t *testing.T) {
 
 		w := compileT(t, r, tc.out).Value()
 
-		if !cmp.Equal(goValue(v), goValue(w)) {
-			t.Error(cmp.Diff(goValue(v), goValue(w)))
+		if diff := cmp.Diff(goValue(v), goValue(w)); diff != "" {
+			t.Error(diff)
 			t.Errorf("\ngot:  %s\nwant: %s", v, w)
 		}
 	}
@@ -1247,7 +1247,8 @@ func TestFillPath(t *testing.T) {
 
 			w := compileT(t, r, tc.out).Value()
 
-			if !cmp.Equal(goValue(v), goValue(w)) {
+			if diff := cmp.Diff(goValue(v), goValue(w)); diff != "" {
+				t.Error(diff)
 				t.Error(cmp.Diff(goValue(v), goValue(w)))
 				t.Errorf("\ngot:  %s\nwant: %s", v, w)
 			}
@@ -1790,7 +1791,7 @@ func TestElem(t *testing.T) {
 		a: foo: b: [Bar=string]: { d: Bar }
 		`,
 		path: []string{"a", "foo", "b", ""},
-		want: "{\n\tc: string + string\n\td: string\n}",
+		want: "{\n\tc: \"foo\" + string\n\td: string\n}",
 	}}
 	for _, tc := range testCases {
 		t.Run("", func(t *testing.T) {

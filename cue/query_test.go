@@ -22,7 +22,7 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/internal/cuetxtar"
 	"cuelang.org/go/internal/diff"
-	"github.com/rogpeppe/go-internal/txtar"
+	"golang.org/x/tools/txtar"
 )
 
 func TestLookupPath(t *testing.T) {
@@ -146,10 +146,10 @@ func compileT(t *testing.T, r *cue.Runtime, s string) cue.Value {
 func TestHidden(t *testing.T) {
 	in := `
 -- cue.mod/module.cue --
-module: "example.com"
+module: "mod.test"
 
 -- in.cue --
-import "example.com/foo"
+import "mod.test/foo"
 
 a: foo.C
 b: _c
@@ -162,8 +162,7 @@ _d: 3
 		`
 
 	a := txtar.Parse([]byte(in))
-	dir := t.TempDir()
-	instance := cuetxtar.Load(a, dir)[0]
+	instance := cuetxtar.Load(a, t.TempDir())[0]
 	if instance.Err != nil {
 		t.Fatal(instance.Err)
 	}
@@ -175,7 +174,7 @@ _d: 3
 		pkg  string
 	}{{
 		path: cue.ParsePath("a"),
-		pkg:  "example.com/foo",
+		pkg:  "mod.test/foo",
 	}, {
 		path: cue.ParsePath("b"),
 		pkg:  "_",

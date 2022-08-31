@@ -25,7 +25,7 @@ import (
 	"cuelang.org/go/cue/parser"
 	"cuelang.org/go/internal/cuetest"
 	"cuelang.org/go/internal/cuetxtar"
-	"github.com/rogpeppe/go-internal/txtar"
+	"golang.org/x/tools/txtar"
 )
 
 func TestFiles(t *testing.T) {
@@ -323,7 +323,7 @@ func TestX(t *testing.T) {
 	t.Skip()
 
 	a := txtar.Parse([]byte(in))
-	instances := cuetxtar.Load(a, "/tmp/test")
+	instances := cuetxtar.Load(a, t.TempDir())
 
 	inst := cue.Build(instances)[0]
 	if inst.Err != nil {

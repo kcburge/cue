@@ -37,7 +37,7 @@ const (
 	InvalidLabel Feature = 0
 
 	// MaxIndex indicates the maximum number of unique strings that are used for
-	// labeles within this CUE implementation.
+	// labels within this CUE implementation.
 	MaxIndex = 1<<(32-indexShift) - 1
 )
 
@@ -171,6 +171,8 @@ func MakeIdentLabel(r StringIndexer, s, pkgpath string) Feature {
 const msgGround = "invalid non-ground value %s (must be concrete %s)"
 
 func labelFromValue(c *OpContext, src Expr, v Value) Feature {
+	v, _ = c.getDefault(v)
+
 	var i int64
 	var t FeatureType
 	if isError(v) {
@@ -292,7 +294,7 @@ func (f Feature) IsRegular() bool {
 func (f Feature) IsString() bool { return f.Typ() == StringLabel }
 
 // IsDef reports whether the label is a definition (an identifier starting with
-// # or #_.
+// # or _#.
 func (f Feature) IsDef() bool {
 	return f.Typ().IsDef()
 }

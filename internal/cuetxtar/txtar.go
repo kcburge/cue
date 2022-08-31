@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"path"
@@ -33,7 +34,7 @@ import (
 	"cuelang.org/go/cue/load"
 	"cuelang.org/go/internal/cuetest"
 	"github.com/google/go-cmp/cmp"
-	"github.com/rogpeppe/go-internal/txtar"
+	"golang.org/x/tools/txtar"
 )
 
 // A TxTarTest represents a test run that process all CUE tests in the txtar
@@ -193,6 +194,8 @@ func formatNode(t *testing.T, n ast.Node) []byte {
 // ValidInstances returns the valid instances for this .txtar file or skips the
 // test if there is an error loading the instances.
 func (t *Test) ValidInstances(args ...string) []*build.Instance {
+	t.Helper()
+
 	a := t.RawInstances(args...)
 	for _, i := range a {
 		if i.Err != nil {
@@ -235,6 +238,8 @@ func Load(a *txtar.Archive, dir string, args ...string) []*build.Instance {
 // Run runs tests defined in txtar files in root or its subdirectories.
 // Only tests for which an `old/name` test output file exists are run.
 func (x *TxTarTest) Run(t *testing.T, f func(tc *Test)) {
+	t.Helper()
+
 	dir, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -242,12 +247,11 @@ func (x *TxTarTest) Run(t *testing.T, f func(tc *Test)) {
 
 	root := x.Root
 
-	err = filepath.Walk(root, func(fullpath string, info os.FileInfo, err error) error {
+	err = filepath.WalkDir(root, func(fullpath string, entry fs.DirEntry, err error) error {
 		if err != nil {
-			t.Fatal(err)
+			return err
 		}
-
-		if info.IsDir() || filepath.Ext(fullpath) != ".txtar" {
+		if entry.IsDir() || filepath.Ext(fullpath) != ".txtar" {
 			return nil
 		}
 

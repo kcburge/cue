@@ -16,16 +16,16 @@ package jsonschema
 
 import (
 	"bytes"
+	"io/fs"
 	"io/ioutil"
-	"os"
 	"path"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/rogpeppe/go-internal/txtar"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/tools/txtar"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
@@ -44,8 +44,10 @@ import (
 //
 // Set CUE_UPDATE=1 to update test files with the corresponding output.
 func TestDecode(t *testing.T) {
-	err := filepath.Walk("testdata", func(fullpath string, info os.FileInfo, err error) error {
-		_ = err
+	err := filepath.WalkDir("testdata", func(fullpath string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
 		if !strings.HasSuffix(fullpath, ".txtar") {
 			return nil
 		}

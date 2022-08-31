@@ -1,0 +1,16 @@
+exec cue trim foo.cue
+cmp foo.cue rewritten
+
+-- foo.cue --
+package p
+
+foo?: #Foo
+
+#Foo: "hello"
+
+-- rewritten --
+package p
+
+foo?: #Foo
+
+#Foo: "hello"

@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rogpeppe/go-internal/txtar"
+	"golang.org/x/tools/txtar"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
@@ -102,17 +102,17 @@ var needFix = map[string]string{
 func TestX(t *testing.T) {
 	in := `
 -- cue.mod/module.cue --
-module: "example.com"
+module: "mod.test"
 
 -- in.cue --
-	`
+`
 
 	if strings.HasSuffix(strings.TrimSpace(in), ".cue --") {
 		t.Skip()
 	}
 
 	a := txtar.Parse([]byte(in))
-	instance := cuetxtar.Load(a, "/tmp/test")[0]
+	instance := cuetxtar.Load(a, t.TempDir())[0]
 	if instance.Err != nil {
 		t.Fatal(instance.Err)
 	}
@@ -126,8 +126,8 @@ module: "example.com"
 
 	// t.Error(debug.NodeString(r, v, nil))
 	// eval.Debug = true
-
 	adt.Verbosity = 1
+
 	e := eval.New(r)
 	ctx := e.NewContext(v)
 	v.Finalize(ctx)

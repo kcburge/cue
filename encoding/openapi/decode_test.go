@@ -16,8 +16,8 @@ package openapi_test
 
 import (
 	"bytes"
+	"io/fs"
 	"io/ioutil"
-	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -41,8 +41,10 @@ import (
 //
 // Set CUE_UPDATE=1 to update test files with the corresponding output.
 func TestDecode(t *testing.T) {
-	err := filepath.Walk("testdata/script", func(fullpath string, info os.FileInfo, err error) error {
-		_ = err
+	err := filepath.WalkDir("testdata/script", func(fullpath string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
 		if !strings.HasSuffix(fullpath, ".txtar") {
 			return nil
 		}
@@ -85,8 +87,8 @@ func TestDecode(t *testing.T) {
 			if err != nil {
 				got = []byte(err.Error())
 			}
-			if !cmp.Equal(errout, got) {
-				t.Error(cmp.Diff(string(got), string(errout)))
+			if diff := cmp.Diff(errout, got); diff != "" {
+				t.Error(diff)
 			}
 
 			if expr != nil {
@@ -103,7 +105,8 @@ func TestDecode(t *testing.T) {
 				b = bytes.TrimSpace(b)
 				out = bytes.TrimSpace(out)
 
-				if !cmp.Equal(b, out) {
+				if diff := cmp.Diff(b, out); diff != "" {
+					t.Error(diff)
 					if cuetest.UpdateGoldenFiles {
 						a.Files[outIndex].Data = b
 						b = txtar.Format(a)

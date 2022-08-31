@@ -27,7 +27,7 @@ import (
 	"cuelang.org/go/internal/core/runtime"
 	"cuelang.org/go/internal/cuetest"
 	"cuelang.org/go/internal/cuetxtar"
-	"github.com/rogpeppe/go-internal/txtar"
+	"golang.org/x/tools/txtar"
 )
 
 var exclude = map[string]string{
@@ -36,7 +36,7 @@ var exclude = map[string]string{
 
 func TestValue(t *testing.T) {
 	test := cuetxtar.TxTarTest{
-		Root:   "./testdata",
+		Root:   "./testdata/main",
 		Name:   "value",
 		Update: cuetest.UpdateGoldenFiles,
 		Skip:   exclude,
@@ -95,7 +95,7 @@ func TestValueX(t *testing.T) {
 	`
 
 	archive := txtar.Parse([]byte(in))
-	a := cuetxtar.Load(archive, "/tmp/test")
+	a := cuetxtar.Load(archive, t.TempDir())
 
 	r := runtime.New()
 	v, errs := compile.Files(nil, r, "", a[0].Files...)

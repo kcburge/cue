@@ -91,38 +91,14 @@ type Environment struct {
 	// TODO(perf): make the following public fields a shareable struct as it
 	// mostly is going to be the same for child nodes.
 
-	// Cyclic indicates a structural cycle was detected for this conjunct or one
-	// of its ancestors.
-	Cyclic bool
-
-	// Deref keeps track of nodes that should dereference to Vertex. It is used
-	// for detecting structural cycle.
-	//
-	// The detection algorithm is based on Tomabechi's quasi-destructive graph
-	// unification. This detection requires dependencies to be resolved into
-	// fully dereferenced vertices. This is not the case in our algorithm:
-	// the result of evaluating conjuncts is placed into dereferenced vertices
-	// _after_ they are evaluated, but the Environment still points to the
-	// non-dereferenced context.
-	//
-	// In order to be able to detect structural cycles, we need to ensure that
-	// at least one node that is part of a cycle in the context in which
-	// conjunctions are evaluated dereferences correctly.
-	//
-	// The only field necessary to detect a structural cycle, however, is
-	// the Status field of the Vertex. So rather than dereferencing a node
-	// proper, it is sufficient to copy the Status of the dereferenced nodes
-	// to these nodes (will always be EvaluatingArcs).
-	Deref []*Vertex
-
-	// Cycles contains vertices for which cycles are detected. It is used
-	// for tracking self-references within structural cycles.
-	//
-	// Unlike Deref, Cycles is not incremented with child nodes.
-	// TODO: Cycles is always a tail end of Deref, so this can be optimized.
-	Cycles []*Vertex
-
 	cache map[Expr]Value
+}
+
+func (e *Environment) up(count int32) *Environment {
+	for ; count > 0; count-- {
+		e = e.Up
+	}
+	return e
 }
 
 type ID int32
@@ -163,9 +139,6 @@ type Vertex struct {
 	// tree.
 	Parent *Vertex
 
-	// Label is the feature leading to this vertex.
-	Label Feature
-
 	// State:
 	//   eval: nil, BaseValue: nil -- unevaluated
 	//   eval: *,   BaseValue: nil -- evaluating
@@ -174,24 +147,28 @@ type Vertex struct {
 	state *nodeContext
 	// TODO: move the following status fields to nodeContext.
 
+	// Label is the feature leading to this vertex.
+	Label Feature
+
 	// status indicates the evaluation progress of this vertex.
 	status VertexStatus
 
 	// isData indicates that this Vertex is to be interepreted as data: pattern
 	// and additional constraints, as well as optional fields, should be
 	// ignored.
-	isData                bool
-	Closed                bool
-	nonMonotonicReject    bool
-	nonMonotonicInsertGen int32
-	nonMonotonicLookupGen int32
+	isData bool
 
-	// EvalCount keeps track of temporary dereferencing during evaluation.
-	// If EvalCount > 0, status should be considered to be EvaluatingArcs.
-	EvalCount int32
+	// Closed indicates whether this Vertex is recursively closed. This is the
+	// case, for instance, if it is a node in a definition or if one of the
+	// conjuncts, or ancestor conjuncts, is a definition.
+	Closed bool
 
-	// SelfCount is used for tracking self-references.
-	SelfCount int32
+	// arcType indicates the level of optionality of this arc.
+	arcType arcType
+
+	// cyclicReferences is a linked list of internal references pointing to this
+	// Vertex. This is used to shorten the path of some structural cycles.
+	cyclicReferences *RefNode
 
 	// BaseValue is the value associated with this vertex. For lists and structs
 	// this is a sentinel value indicating its kind.
@@ -216,6 +193,29 @@ type Vertex struct {
 	// This information is used to compute the topological sort of arcs.
 	Structs []*StructInfo
 }
+
+// isDefined indicates whether this arc is a non-optional field.
+func (v *Vertex) isDefined() bool {
+	return v.arcType == arcMember
+}
+
+type arcType uint8
+
+const (
+	// arcMember means that this arc is a normal non-optional field
+	// (including regular, hidden, and definition fields).
+	arcMember arcType = iota
+
+	// TODO: define a type for optional arcs. This will be needed for pulling
+	// in optional fields into the Vertex, which, in turn, is needed for
+	// structure sharing, among other things.
+	// We could also define types for required fields and potentially lets.
+
+	// arcVoid means that an arc does not exist. This happens when an arc
+	// is provisionally added as part of a comprehension, but when this
+	// comprehension has not yet yielded any results.
+	arcVoid
+)
 
 func (v *Vertex) Clone() *Vertex {
 	c := *v
@@ -301,9 +301,6 @@ func (s VertexStatus) String() string {
 }
 
 func (v *Vertex) Status() VertexStatus {
-	if v.EvalCount > 0 {
-		return EvaluatingArcs
-	}
 	return v.status
 }
 
@@ -334,6 +331,9 @@ func (v *Vertex) Value() Value {
 
 // isUndefined reports whether a vertex does not have a useable BaseValue yet.
 func (v *Vertex) isUndefined() bool {
+	if !v.isDefined() {
+		return true
+	}
 	switch v.BaseValue {
 	case nil, cycle:
 		return true
@@ -529,6 +529,8 @@ func (v *Vertex) Kind() Kind {
 	// This is possible when evaluating comprehensions. It is potentially
 	// not known at this time what the type is.
 	switch {
+	// TODO: using this line would be more stable.
+	// case v.status != Finalized && v.state != nil:
 	case v.state != nil:
 		return v.state.kind
 	case v.BaseValue == nil:
@@ -550,7 +552,7 @@ func (v *Vertex) OptionalTypes() OptionalType {
 // as opposed to whether it is allowed by a pattern constraint.
 func (v *Vertex) IsOptional(label Feature) bool {
 	for _, s := range v.Structs {
-		if s.IsOptional(label) {
+		if s.IsOptionalField(label) {
 			return true
 		}
 	}
@@ -573,7 +575,7 @@ func (v *Vertex) IsClosedStruct() bool {
 
 	case *Disjunction:
 	}
-	return v.Closed || isClosed(v)
+	return isClosed(v)
 }
 
 func (v *Vertex) IsClosedList() bool {
@@ -674,31 +676,12 @@ func (v *Vertex) Elems() []*Vertex {
 
 // GetArc returns a Vertex for the outgoing arc with label f. It creates and
 // ads one if it doesn't yet exist.
-func (v *Vertex) GetArc(c *OpContext, f Feature) (arc *Vertex, isNew bool) {
+func (v *Vertex) GetArc(c *OpContext, f Feature, t arcType) (arc *Vertex, isNew bool) {
 	arc = v.Lookup(f)
 	if arc == nil {
-		for _, a := range v.state.usedArcs {
-			if a.Label == f {
-				arc = a
-				v.Arcs = append(v.Arcs, arc)
-				isNew = true
-				if c.nonMonotonicInsertNest > 0 {
-					a.nonMonotonicInsertGen = c.nonMonotonicGeneration
-				}
-				break
-			}
-		}
-	}
-	if arc == nil {
-		arc = &Vertex{Parent: v, Label: f}
+		arc = &Vertex{Parent: v, Label: f, arcType: t}
 		v.Arcs = append(v.Arcs, arc)
 		isNew = true
-		if c.nonMonotonicInsertNest > 0 {
-			arc.nonMonotonicInsertGen = c.nonMonotonicGeneration
-		}
-	}
-	if c.nonMonotonicInsertNest == 0 {
-		arc.nonMonotonicInsertGen = 0
 	}
 	return arc, isNew
 }
@@ -726,11 +709,21 @@ func (v *Vertex) AddConjunct(c Conjunct) *Bottom {
 }
 
 func (v *Vertex) addConjunct(c Conjunct) {
+	switch c.x.(type) {
+	case *OptionalField, *BulkOptionalField, *Ellipsis:
+	default:
+		v.arcType = arcMember
+	}
 	for _, x := range v.Conjuncts {
-		if x == c {
+		// TODO: disregard certain fields from comparison (e.g. Refs)?
+		if x.CloseInfo.closeInfo == c.CloseInfo.closeInfo && x.x == c.x {
 			return
 		}
 	}
+	v.Conjuncts = append(v.Conjuncts, c)
+}
+
+func (v *Vertex) addConjunctUnchecked(c Conjunct) {
 	v.Conjuncts = append(v.Conjuncts, c)
 }
 
@@ -741,7 +734,7 @@ func (v *Vertex) AddStruct(s *StructLit, env *Environment, ci CloseInfo) *Struct
 		CloseInfo: ci,
 	}
 	for _, t := range v.Structs {
-		if *t == info {
+		if *t == info { // TODO: check for different identity.
 			return t
 		}
 	}
@@ -807,7 +800,12 @@ func (c *Conjunct) Source() ast.Node {
 }
 
 func (c *Conjunct) Field() Node {
-	return c.x
+	switch x := c.x.(type) {
+	case *Comprehension:
+		return x.Value
+	default:
+		return c.x
+	}
 }
 
 // Elem retrieves the Elem form of the contained conjunct.
@@ -826,12 +824,20 @@ func (c *Conjunct) Elem() Elem {
 // Expr retrieves the expression form of the contained conjunct.
 // If it is a field or comprehension, it will return its associated value.
 func (c *Conjunct) Expr() Expr {
-	switch x := c.x.(type) {
+	return ToExpr(c.x)
+}
+
+// ToExpr extracts the underlying expression for a Node. If something is already
+// an Expr, it will return it as is, if it is a field, it will return its value,
+// and for comprehensions it returns the yielded struct.
+func ToExpr(n Node) Expr {
+	switch x := n.(type) {
 	case Expr:
 		return x
-	// TODO: comprehension.
 	case interface{ expr() Expr }:
 		return x.expr()
+	case *Comprehension:
+		return ToExpr(x.Value)
 	default:
 		panic("unreachable")
 	}

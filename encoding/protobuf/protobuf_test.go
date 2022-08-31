@@ -17,13 +17,14 @@ package protobuf
 import (
 	"bytes"
 	"fmt"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/kr/pretty"
+	"github.com/google/go-cmp/cmp"
 
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/errors"
@@ -66,8 +67,8 @@ func TestExtractDefinitions(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if desc := pretty.Diff(out.String(), string(b)); len(desc) > 0 {
-				t.Errorf("files differ:\n%v", desc)
+			if diff := cmp.Diff(out.String(), string(b)); diff != "" {
+				t.Error(diff)
 			}
 		})
 	}
@@ -121,8 +122,8 @@ func TestBuild(t *testing.T) {
 		gotFiles[rel] = f
 	}
 
-	_ = filepath.Walk("testdata/istio.io/api", func(path string, fi os.FileInfo, err error) error {
-		if err != nil || fi.IsDir() || !strings.HasSuffix(path, ".cue") {
+	_ = filepath.WalkDir("testdata/istio.io/api", func(path string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".cue") {
 			return err
 		}
 

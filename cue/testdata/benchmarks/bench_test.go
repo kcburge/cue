@@ -21,7 +21,7 @@ import (
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/internal/cuetxtar"
-	"github.com/rogpeppe/go-internal/txtar"
+	"golang.org/x/tools/txtar"
 )
 
 func Benchmark(b *testing.B) {
@@ -41,14 +41,14 @@ func Benchmark(b *testing.B) {
 			b.Fatal(err)
 		}
 
-		inst := cue.Build(cuetxtar.Load(a, "/cuetest"))[0]
+		inst := cue.Build(cuetxtar.Load(a, b.TempDir()))[0]
 		if inst.Err != nil {
 			b.Fatal(inst.Err)
 		}
 
 		b.Run(name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				inst := cue.Build(cuetxtar.Load(a, "/cuetest"))[0]
+				inst := cue.Build(cuetxtar.Load(a, b.TempDir()))[0]
 				if inst.Err != nil {
 					b.Fatal(inst.Err)
 				}

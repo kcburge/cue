@@ -17,7 +17,6 @@
 // Note that the result is not valid CUE, but instead prints the internals
 // of an ADT node in human-readable form. It uses a simple indentation algorithm
 // for improved readability and diffing.
-//
 package debug
 
 import (
@@ -303,7 +302,7 @@ func (w *compactPrinter) node(n adt.Node) {
 
 	case *adt.Comprehension:
 		w.node(x.Clauses)
-		w.node(x.Value)
+		w.node(adt.ToExpr(x.Value))
 
 	case *adt.ForClause:
 		w.string("for ")

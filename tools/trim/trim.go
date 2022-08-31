@@ -24,29 +24,27 @@
 // be removed because a definition field dominates a regular field and because
 // the latter subsumes the default value of the former.
 //
-//
 // Examples:
 //
-// 	light: [string]: {
-// 		room:          string
-// 		brightnessOff: *0.0 | >=0 & <=100.0
-// 		brightnessOn:  *100.0 | >=0 & <=100.0
-// 	}
+//	light: [string]: {
+//		room:          string
+//		brightnessOff: *0.0 | >=0 & <=100.0
+//		brightnessOn:  *100.0 | >=0 & <=100.0
+//	}
 //
-// 	light: ceiling50: {
-// 		room:          "MasterBedroom"
-// 		brightnessOff: 0.0    // this line
-// 		brightnessOn:  100.0  // and this line will be removed
-// 	}
+//	light: ceiling50: {
+//		room:          "MasterBedroom"
+//		brightnessOff: 0.0    // this line
+//		brightnessOn:  100.0  // and this line will be removed
+//	}
 //
 // Results in:
 //
-// 	// Unmodified: light: [string]: { ... }
+//	// Unmodified: light: [string]: { ... }
 //
-// 	light: ceiling50: {
-// 		room: "MasterBedroom"
-// 	}
-//
+//	light: ceiling50: {
+//		room: "MasterBedroom"
+//	}
 package trim
 
 import (
@@ -237,7 +235,7 @@ func (t *trimmer) addDominators(d, v *adt.Vertex, hasDisjunction bool) (doms *ad
 			doms.AddConjunct(c)
 		default:
 			if r, ok := c.Elem().(adt.Resolver); ok {
-				x, _ := t.ctx.Resolve(c.Env, r)
+				x, _ := t.ctx.Resolve(c, r)
 				// Even if this is not a dominator now, descendants will be.
 				if x != nil && x.Label.IsDef() {
 					for _, c := range x.Conjuncts {

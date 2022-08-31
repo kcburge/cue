@@ -16,34 +16,12 @@ fib: {
 		out: n
 	}
 }
-fib2:  (fib & {n: 2}).out
-fib7:  (fib & {n: 7}).out
-fib12: (fib & {n: 12}).out
--- out/def --
-// This indirection is needed to avoid binding references to fib
-// within fib to the instantiated version.
-fibRec: {
-	nn:  int
-	out: (fib & {
-		n: nn
-	}).out
-}
-fib: {
-	n: int
-	if n >= 2 {
-		out: (fibRec & {
-			nn: n - 2
-		}).out + (fibRec & {
-			nn: n - 1
-		}).out
-	}
-	if n < 2 {
-		out: n
-	}
-}
-fib2:  1
-fib7:  13
-fib12: 144
+fib1:  (fib & {n: 1}).out  // MAY NOT be an error
+fib2:  (fib & {n: 2}).out  // MAY be an error
+fib3:  (fib & {n: 3}).out  // SHOULD be an error
+fib7:  (fib & {n: 7}).out  // Error
+fib12: (fib & {n: 12}).out // Error
+
 -- out/legacy-debug --
 <0>{fibRec: <1>{nn: int, out: (<2>.fib & <3>{n: <4>.nn}).out}, fib: <5>{n: int if (<6>.n >= 2) yield <7>{out: ((<2>.fibRec & <8>{nn: (<6>.n - 2)}).out + (<2>.fibRec & <9>{nn: (<6>.n - 1)}).out)},  if (<6>.n < 2) yield <10>{out: <6>.n}}, fib2: 1, fib7: 13, fib12: 144}
 -- out/compile --
@@ -68,8 +46,14 @@ fib12: 144
       out: 〈1;n〉
     }
   }
+  fib1: (〈0;fib〉 & {
+    n: 1
+  }).out
   fib2: (〈0;fib〉 & {
     n: 2
+  }).out
+  fib3: (〈0;fib〉 & {
+    n: 3
   }).out
   fib7: (〈0;fib〉 & {
     n: 7
@@ -80,6 +64,8 @@ fib12: 144
 }
 -- out/eval --
 Errors:
+structural cycle:
+    ./in.cue:3:25
 structural cycle:
     ./in.cue:8:9
 
@@ -106,15 +92,34 @@ Result:
     // fib: non-concrete value int in operand to <:
     //     ./in.cue:10:5
     //     ./in.cue:5:5
+    out: (_|_){
+      // [incomplete] fib: non-concrete value int in operand to >=:
+      //     ./in.cue:7:5
+      //     ./in.cue:5:5
+      // fib: non-concrete value int in operand to <:
+      //     ./in.cue:10:5
+      //     ./in.cue:5:5
+    }
     n: (int){ int }
   }
+  fib1: (int){ 1 }
   fib2: (int){ 1 }
+  fib3: (_|_){
+    // [structural cycle] structural cycle:
+    //     ./in.cue:3:25
+    // structural cycle:
+    //     ./in.cue:8:38
+  }
   fib7: (_|_){
     // [structural cycle] structural cycle:
+    //     ./in.cue:3:25
+    // structural cycle:
     //     ./in.cue:8:9
   }
   fib12: (_|_){
     // [structural cycle] structural cycle:
+    //     ./in.cue:3:25
+    // structural cycle:
     //     ./in.cue:8:9
   }
 }

@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"path"
@@ -26,12 +27,13 @@ import (
 	goruntime "runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/shlex"
 	"github.com/rogpeppe/go-internal/goproxytest"
 	"github.com/rogpeppe/go-internal/gotooltest"
 	"github.com/rogpeppe/go-internal/testscript"
-	"github.com/rogpeppe/go-internal/txtar"
+	"golang.org/x/tools/txtar"
 
 	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/parser"
@@ -46,20 +48,18 @@ const (
 // even if still valid in backwards compatibility mode.
 func TestLatest(t *testing.T) {
 	root := filepath.Join("testdata", "script")
-	filepath.Walk(root, func(fullpath string, info os.FileInfo, err error) error {
+	if err := filepath.WalkDir(root, func(fullpath string, entry fs.DirEntry, err error) error {
 		if err != nil {
-			t.Error(err)
-			return nil
+			return err
 		}
-		if !strings.HasSuffix(fullpath, ".txt") ||
+		if !strings.HasSuffix(fullpath, ".txtar") ||
 			strings.HasPrefix(filepath.Base(fullpath), "fix") {
 			return nil
 		}
 
 		a, err := txtar.ParseFile(fullpath)
 		if err != nil {
-			t.Error(err)
-			return nil
+			return err
 		}
 		if bytes.HasPrefix(a.Comment, []byte("!")) {
 			return nil
@@ -81,7 +81,9 @@ func TestLatest(t *testing.T) {
 			})
 		}
 		return nil
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestScript(t *testing.T) {
@@ -90,8 +92,9 @@ func TestScript(t *testing.T) {
 		t.Fatalf("cannot start proxy: %v", err)
 	}
 	p := testscript.Params{
-		Dir:           filepath.Join("testdata", "script"),
-		UpdateScripts: cuetest.UpdateGoldenFiles,
+		Dir:                 filepath.Join("testdata", "script"),
+		UpdateScripts:       cuetest.UpdateGoldenFiles,
+		RequireExplicitExec: true,
 		Setup: func(e *testscript.Env) error {
 			// Set up a home dir within work dir with a . prefix so that the
 			// Go/CUE pattern ./... does not descend into it.
@@ -122,7 +125,7 @@ func TestScript(t *testing.T) {
 // Usage Comment out t.Skip() and set file to test.
 func TestX(t *testing.T) {
 	t.Skip()
-	const path = "./testdata/script/eval_e.txt"
+	const path = "./testdata/script/eval_e.txtar"
 
 	check := func(err error) {
 		t.Helper()
@@ -173,11 +176,28 @@ func TestX(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
-	// Setting inTest causes filenames printed in error messages
-	// to be normalized so the output looks the same on Unix
-	// as Windows.
 	os.Exit(testscript.RunMain(m, map[string]func() int{
 		"cue": MainTest,
+		"cue_stdinpipe": func() int {
+			cwd, _ := os.Getwd()
+			if err := mainTestStdinPipe(); err != nil {
+				if err != ErrPrintedError { // print errors like Main
+					errors.Print(os.Stderr, err, &errors.Config{
+						Cwd:     cwd,
+						ToSlash: inTest,
+					})
+				}
+				return 1
+			}
+			return 0
+		},
+		"testcmd": func() int {
+			if err := testCmd(); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				return 1
+			}
+			return 0
+		},
 	}))
 }
 
@@ -192,5 +212,52 @@ func homeEnvName() string {
 		return "home"
 	default:
 		return "HOME"
+	}
+}
+
+func mainTestStdinPipe() error {
+	// Like MainTest, but sets stdin to a pipe,
+	// to emulate stdin reads like a terminal.
+	inTest = true
+	cmd, err := New(os.Args[1:])
+	if err != nil {
+		return err
+	}
+	pr, pw, err := os.Pipe()
+	if err != nil {
+		return err
+	}
+	cmd.SetInput(pr)
+	_ = pw // we don't write to stdin at all, for now
+	return cmd.Run(context.Background())
+}
+
+func testCmd() error {
+	cmd := os.Args[1]
+	args := os.Args[2:]
+	switch cmd {
+	case "concurrent":
+		// Used to test that we support running tasks concurrently.
+		// Run like `concurrent foo bar` and `concurrent bar foo`,
+		// each command creates one file and waits for the other to exist.
+		// If the commands are run sequentially, neither will succeed.
+		if len(args) != 2 {
+			return fmt.Errorf("usage: concurrent to_create to_wait\n")
+		}
+		toCreate := args[0]
+		toWait := args[1]
+		if err := os.WriteFile(toCreate, []byte("dummy"), 0o666); err != nil {
+			return err
+		}
+		for i := 0; i < 10; i++ {
+			if _, err := os.Stat(toWait); err == nil {
+				fmt.Printf("wrote %s and found %s\n", toCreate, toWait)
+				return nil
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		return fmt.Errorf("timed out waiting for %s to exist", toWait)
+	default:
+		return fmt.Errorf("unknown command: %q\n", cmd)
 	}
 }

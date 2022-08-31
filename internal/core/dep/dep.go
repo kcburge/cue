@@ -207,6 +207,12 @@ func (c *visitor) markExpr(env *adt.Environment, expr adt.Elem) {
 		for _, e := range x.Decls {
 			c.markDecl(env, e)
 		}
+
+	case *adt.Comprehension:
+		for i := x.Nest(); i > 0; i-- {
+			env = &adt.Environment{Up: env, Vertex: empty}
+		}
+		c.markComprehension(env, x)
 	}
 }
 
@@ -222,7 +228,10 @@ func (c *visitor) markResolver(env *adt.Environment, r adt.Resolver) {
 		return
 	}
 
-	if ref, _ := c.ctxt.Resolve(env, r); ref != nil {
+	// Note: it is okay to pass an empty CloseInfo{} here as we assume that
+	// all nodes are finalized already and we need neither closedness nor cycle
+	// checks.
+	if ref, _ := c.ctxt.Resolve(adt.MakeConjunct(env, r, adt.CloseInfo{}), r); ref != nil {
 		if ref != c.node && ref != empty {
 			d := Dependency{
 				Node:      ref,
@@ -303,7 +312,7 @@ func (c *visitor) markDecl(env *adt.Environment, d adt.Decl) {
 
 func (c *visitor) markComprehension(env *adt.Environment, y *adt.Comprehension) {
 	env = c.markYielder(env, y.Clauses)
-	c.markExpr(env, y.Value)
+	c.markExpr(env, adt.ToExpr(y.Value))
 }
 
 func (c *visitor) markYielder(env *adt.Environment, y adt.Yielder) *adt.Environment {

@@ -1,0 +1,199 @@
+-- x.cue --
+// variants of fib
+
+inline: small: {
+	f: {
+		n: int
+		out: (f & {"n": n - 1}).out
+	}
+}
+
+inline: medium: {
+	f2:  (f & {n: 2}).out
+	fRec: {nn: int, out: (f & {n: nn}).out}
+	f: {
+		n: int
+		out: (fRec & {nn: n - 1}).out
+	}
+}
+
+inline: patterns: {
+	f: n: (f & {n: {}}).n
+	f: n: {}
+	[string]: {n: {}}
+	f: [string]: {}
+	f: {}
+}
+
+inline: acrossFields: {
+	f: {
+		in:  number
+		out: in
+	}
+	k00: 0
+	k10: (f & {in: k00}).out
+	k20: (f & {in: k10}).out
+	k30: (f & {in: k20}).out
+
+	// invalid recursion is here.
+	k10: (f & {in: k30}).out
+}
+-- out/compile --
+--- x.cue
+{
+  inline: {
+    small: {
+      f: {
+        n: int
+        out: (〈1;f〉 & {
+          n: (〈1;n〉 - 1)
+        }).out
+      }
+    }
+  }
+  inline: {
+    medium: {
+      f2: (〈0;f〉 & {
+        n: 2
+      }).out
+      fRec: {
+        nn: int
+        out: (〈1;f〉 & {
+          n: 〈1;nn〉
+        }).out
+      }
+      f: {
+        n: int
+        out: (〈1;fRec〉 & {
+          nn: (〈1;n〉 - 1)
+        }).out
+      }
+    }
+  }
+  inline: {
+    patterns: {
+      f: {
+        n: (〈1;f〉 & {
+          n: {}
+        }).n
+      }
+      f: {
+        n: {}
+      }
+      [string]: {
+        n: {}
+      }
+      f: {
+        [string]: {}
+      }
+      f: {}
+    }
+  }
+  inline: {
+    acrossFields: {
+      f: {
+        in: number
+        out: 〈0;in〉
+      }
+      k00: 0
+      k10: (〈0;f〉 & {
+        in: 〈1;k00〉
+      }).out
+      k20: (〈0;f〉 & {
+        in: 〈1;k10〉
+      }).out
+      k30: (〈0;f〉 & {
+        in: 〈1;k20〉
+      }).out
+      k10: (〈0;f〉 & {
+        in: 〈1;k30〉
+      }).out
+    }
+  }
+}
+-- out/eval --
+Errors:
+structural cycle:
+    ./x.cue:6:9
+structural cycle:
+    ./x.cue:12:24
+structural cycle:
+    ./x.cue:20:9
+in: structural cycle:
+    ./x.cue:34:8
+in: structural cycle:
+    ./x.cue:35:8
+in: structural cycle:
+    ./x.cue:38:8
+
+Result:
+(_|_){
+  // [structural cycle]
+  inline: (_|_){
+    // [structural cycle]
+    small: (_|_){
+      // [structural cycle]
+      f: (_|_){
+        // [structural cycle]
+        n: (int){ int }
+        out: (_|_){
+          // [structural cycle] structural cycle:
+          //     ./x.cue:6:9
+        }
+      }
+    }
+    medium: (_|_){
+      // [structural cycle]
+      f2: (_|_){
+        // [structural cycle] structural cycle:
+        //     ./x.cue:12:24
+      }
+      fRec: (_|_){
+        // [structural cycle]
+        nn: (int){ int }
+        out: (_|_){
+          // [structural cycle] structural cycle:
+          //     ./x.cue:12:24
+        }
+      }
+      f: (_|_){
+        // [structural cycle]
+        n: (int){ int }
+        out: (_|_){
+          // [structural cycle] structural cycle:
+          //     ./x.cue:12:24
+        }
+      }
+    }
+    patterns: (_|_){
+      // [structural cycle]
+      f: (_|_){
+        // [structural cycle]
+        n: (_|_){
+          // [structural cycle] structural cycle:
+          //     ./x.cue:20:9
+        }
+      }
+    }
+    acrossFields: (_|_){
+      // [structural cycle]
+      f: (struct){
+        in: (number){ number }
+        out: (number){ number }
+      }
+      k00: (int){ 0 }
+      k10: (_|_){
+        // [structural cycle] in: structural cycle:
+        //     ./x.cue:38:8
+      }
+      k20: (_|_){
+        // [structural cycle] in: structural cycle:
+        //     ./x.cue:34:8
+      }
+      k30: (_|_){
+        // [structural cycle] in: structural cycle:
+        //     ./x.cue:35:8
+      }
+    }
+  }
+}

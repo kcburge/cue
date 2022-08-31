@@ -34,12 +34,12 @@ import (
 	"cuelang.org/go/internal/cuetest"
 	"cuelang.org/go/internal/cuetxtar"
 	"cuelang.org/go/internal/value"
-	"github.com/rogpeppe/go-internal/txtar"
+	"golang.org/x/tools/txtar"
 )
 
 func TestDefinition(t *testing.T) {
 	test := cuetxtar.TxTarTest{
-		Root:   "./testdata",
+		Root:   "./testdata/main",
 		Name:   "definition",
 		Update: cuetest.UpdateGoldenFiles,
 	}
@@ -302,7 +302,7 @@ package test
 	`
 
 	archive := txtar.Parse([]byte(in))
-	a := cuetxtar.Load(archive, "/tmp/test")
+	a := cuetxtar.Load(archive, t.TempDir())
 	if err := a[0].Err; err != nil {
 		t.Fatal(err)
 	}

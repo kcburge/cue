@@ -1,6 +1,7 @@
 package basics
 
 import (
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -8,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/rogpeppe/go-internal/testscript"
-	"github.com/rogpeppe/go-internal/txtar"
+	"golang.org/x/tools/txtar"
 
 	"cuelang.org/go/cmd/cue/cmd"
 	"cuelang.org/go/cue/parser"
@@ -18,19 +19,17 @@ import (
 // TestLatest checks that the examples match the latest language standard,
 // even if still valid in backwards compatibility mode.
 func TestLatest(t *testing.T) {
-	filepath.Walk(".", func(fullpath string, info os.FileInfo, err error) error {
+	if err := filepath.WalkDir(".", func(fullpath string, entry fs.DirEntry, err error) error {
 		if err != nil {
-			t.Error(err)
-			return nil
+			return err
 		}
-		if !strings.HasSuffix(fullpath, ".txt") {
+		if !strings.HasSuffix(fullpath, ".txtar") {
 			return nil
 		}
 
 		a, err := txtar.ParseFile(fullpath)
 		if err != nil {
-			t.Error(err)
-			return nil
+			return err
 		}
 
 		for _, f := range a.Files {
@@ -46,20 +45,25 @@ func TestLatest(t *testing.T) {
 			})
 		}
 		return nil
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestScript(t *testing.T) {
-	filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
-		if info.IsDir() {
+	if err := filepath.WalkDir(".", func(path string, entry fs.DirEntry, err error) error {
+		if entry.IsDir() {
 			return filepath.SkipDir
 		}
 		testscript.Run(t, testscript.Params{
-			Dir:           path,
-			UpdateScripts: cuetest.UpdateGoldenFiles,
+			Dir:                 path,
+			UpdateScripts:       cuetest.UpdateGoldenFiles,
+			RequireExplicitExec: true,
 		})
 		return nil
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestMain(m *testing.M) {

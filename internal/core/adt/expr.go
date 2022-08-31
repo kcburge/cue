@@ -76,7 +76,7 @@ func (x *StructLit) evaluate(c *OpContext) Value {
 	e := c.Env(0)
 	v := &Vertex{
 		Parent:    e.Vertex,
-		Conjuncts: []Conjunct{{e, x, CloseInfo{}}},
+		Conjuncts: []Conjunct{{e, x, c.ci}},
 	}
 	// evaluate may not finalize a field, as the resulting value may be
 	// used in a context where more conjuncts are added. It may also lead
@@ -165,7 +165,7 @@ func (o *StructLit) OptionalTypes() OptionalType {
 	return o.types
 }
 
-func (o *StructLit) IsOptional(label Feature) bool {
+func (o *StructLit) IsOptionalField(label Feature) bool {
 	for _, f := range o.Fields {
 		if f.Label == label && len(f.Optional) > 0 {
 			return true
@@ -182,14 +182,13 @@ func (o *StructLit) IsOptional(label Feature) bool {
 // Field represents a field with a fixed label. It can be a regular field,
 // definition or hidden field.
 //
-//   foo: bar
-//   #foo: bar
-//   _foo: bar
+//	foo: bar
+//	#foo: bar
+//	_foo: bar
 //
 // Legacy:
 //
-//   Foo :: bar
-//
+//	Foo :: bar
 type Field struct {
 	Src *ast.Field
 
@@ -206,8 +205,7 @@ func (x *Field) Source() ast.Node {
 
 // An OptionalField represents an optional regular field.
 //
-//   foo?: expr
-//
+//	foo?: expr
 type OptionalField struct {
 	Src   *ast.Field
 	Label Feature
@@ -223,8 +221,7 @@ func (x *OptionalField) Source() ast.Node {
 
 // A BulkOptionalField represents a set of optional field.
 //
-//   [expr]: expr
-//
+//	[expr]: expr
 type BulkOptionalField struct {
 	Src    *ast.Field // Elipsis or Field
 	Filter Expr
@@ -241,8 +238,7 @@ func (x *BulkOptionalField) Source() ast.Node {
 
 // A Ellipsis represents a set of optional fields of a given type.
 //
-//   ...T
-//
+//	...T
 type Ellipsis struct {
 	Src   *ast.Ellipsis
 	Value Expr
@@ -257,9 +253,8 @@ func (x *Ellipsis) Source() ast.Node {
 
 // A DynamicField represents a regular field for which the key is computed.
 //
-//    "\(expr)": expr
-//    (expr): expr
-//
+//	"\(expr)": expr
+//	(expr): expr
 type DynamicField struct {
 	Src   *ast.Field
 	Key   Expr
@@ -279,8 +274,7 @@ func (x *DynamicField) Source() ast.Node {
 
 // A ListLit represents an unevaluated list literal.
 //
-//    [a, for x in src { ... }, b, ...T]
-//
+//	[a, for x in src { ... }, b, ...T]
 type ListLit struct {
 	Src *ast.ListLit
 
@@ -301,7 +295,7 @@ func (x *ListLit) evaluate(c *OpContext) Value {
 	e := c.Env(0)
 	v := &Vertex{
 		Parent:    e.Vertex,
-		Conjuncts: []Conjunct{{e, x, CloseInfo{}}},
+		Conjuncts: []Conjunct{{e, x, c.ci}},
 	}
 	// TODO: should be AllArcs and then use Finalize for builtins?
 	c.Unify(v, Finalized) // TODO: also partial okay?
@@ -419,11 +413,10 @@ func (x *Top) Kind() Kind { return TopKind }
 // BasicType represents all values of a certain Kind. It can be used as a Value
 // and Expr.
 //
-//   string
-//   int
-//   num
-//   bool
-//
+//	string
+//	int
+//	num
+//	bool
 type BasicType struct {
 	Src ast.Node
 	K   Kind
@@ -452,9 +445,8 @@ func (x *BasicType) Kind() Kind { return x.K }
 
 // BoundExpr represents an unresolved unary comparator.
 //
-//    <a
-//    =~MyPattern
-//
+//	<a
+//	=~MyPattern
 type BoundExpr struct {
 	Src  *ast.UnaryExpr
 	Op   Op
@@ -585,9 +577,8 @@ func (x *BoundExpr) evaluate(ctx *OpContext) Value {
 // A BoundValue is a fully evaluated unary comparator that can be used to
 // validate other values.
 //
-//    <5
-//    =~"Name$"
-//
+//	<5
+//	=~"Name$"
 type BoundValue struct {
 	Src   ast.Expr
 	Op    Op
@@ -704,8 +695,7 @@ func (x *NodeLink) resolve(c *OpContext, state VertexStatus) *Vertex {
 
 // A FieldReference represents a lexical reference to a field.
 //
-//    a
-//
+//	a
 type FieldReference struct {
 	Src     *ast.Ident
 	UpCount int32
@@ -727,8 +717,9 @@ func (x *FieldReference) resolve(c *OpContext, state VertexStatus) *Vertex {
 
 // A ValueReference represents a lexical reference to a value.
 //
-//    a: X=b
+// Example: an X referring to
 //
+//	a: X=b
 type ValueReference struct {
 	Src     *ast.Ident
 	UpCount int32
@@ -752,8 +743,9 @@ func (x *ValueReference) resolve(c *OpContext, state VertexStatus) *Vertex {
 
 // A LabelReference refers to the string or integer value of a label.
 //
-//    [X=Pattern]: b: X
+// Example: an X referring to
 //
+//	[X=Pattern]: b: a
 type LabelReference struct {
 	Src     *ast.Ident
 	UpCount int32
@@ -783,9 +775,11 @@ func (x *LabelReference) evaluate(ctx *OpContext) Value {
 
 // A DynamicReference is like a LabelReference, but with a computed label.
 //
-//    X=(x): X
-//    X="\(x)": X
+// Example: an X referring to
 //
+//	X=(x): v
+//	X="\(x)": v
+//	X=[string]: v
 type DynamicReference struct {
 	Src     *ast.Ident
 	UpCount int32
@@ -807,6 +801,14 @@ func (x *DynamicReference) Source() ast.Node {
 	return x.Src
 }
 
+func (x *DynamicReference) EvaluateLabel(ctx *OpContext, env *Environment) Feature {
+	env = env.up(x.UpCount)
+	frame := ctx.PushState(env, x.Src)
+	v := ctx.value(x.Label)
+	ctx.PopState(frame)
+	return ctx.Label(x, v)
+}
+
 func (x *DynamicReference) resolve(ctx *OpContext, state VertexStatus) *Vertex {
 	e := ctx.Env(x.UpCount)
 	frame := ctx.PushState(e, x.Src)
@@ -818,10 +820,11 @@ func (x *DynamicReference) resolve(ctx *OpContext, state VertexStatus) *Vertex {
 
 // An ImportReference refers to an imported package.
 //
-//    import "strings"
+// Example: strings in
 //
-//    strings.ToLower("Upper")
+//	import "strings"
 //
+//	strings.ToLower("Upper")
 type ImportReference struct {
 	Src        *ast.Ident
 	ImportPath Feature
@@ -846,8 +849,9 @@ func (x *ImportReference) resolve(ctx *OpContext, state VertexStatus) *Vertex {
 
 // A LetReference evaluates a let expression in its original environment.
 //
-//   let X = x
+// Example: an X referring to
 //
+//	let X = x
 type LetReference struct {
 	Src     *ast.Ident
 	UpCount int32
@@ -869,7 +873,11 @@ func (x *LetReference) resolve(c *OpContext, state VertexStatus) *Vertex {
 		panic("nil expression")
 	}
 	// Anonymous arc.
-	return &Vertex{Parent: nil, Label: label, Conjuncts: []Conjunct{{e, x.X, CloseInfo{}}}}
+	return &Vertex{
+		Parent:    e.Vertex,
+		Label:     label,
+		Conjuncts: []Conjunct{{e, x.X, c.ci}},
+	}
 }
 
 func (x *LetReference) evaluate(c *OpContext) Value {
@@ -881,8 +889,7 @@ func (x *LetReference) evaluate(c *OpContext) Value {
 
 // A SelectorExpr looks up a fixed field in an expression.
 //
-//     X.Sel
-//
+//	a.sel
 type SelectorExpr struct {
 	Src *ast.SelectorExpr
 	X   Expr
@@ -916,8 +923,7 @@ func (x *SelectorExpr) resolve(c *OpContext, state VertexStatus) *Vertex {
 
 // IndexExpr is like a selector, but selects an index.
 //
-//    X[Index]
-//
+//	a[index]
 type IndexExpr struct {
 	Src   *ast.IndexExpr
 	X     Expr
@@ -954,8 +960,7 @@ func (x *IndexExpr) resolve(ctx *OpContext, state VertexStatus) *Vertex {
 
 // A SliceExpr represents a slice operation. (Not currently in spec.)
 //
-//    X[Lo:Hi:Stride]
-//
+//	X[Lo:Hi:Stride]
 type SliceExpr struct {
 	Src    *ast.SliceExpr
 	X      Expr
@@ -1046,8 +1051,7 @@ func (x *SliceExpr) evaluate(c *OpContext) Value {
 
 // An Interpolation is a string interpolation.
 //
-//    "a \(b) c"
-//
+//	"a \(b) c"
 type Interpolation struct {
 	Src   *ast.Interpolation
 	K     Kind   // string or bytes
@@ -1088,9 +1092,8 @@ func (x *Interpolation) evaluate(c *OpContext) Value {
 
 // UnaryExpr is a unary expression.
 //
-//    Op X
-//    -X !X +X
-//
+//	Op X
+//	-X !X +X
 type UnaryExpr struct {
 	Src *ast.UnaryExpr
 	Op  Op
@@ -1149,9 +1152,8 @@ func (x *UnaryExpr) evaluate(c *OpContext) Value {
 
 // BinaryExpr is a binary expression.
 //
-//    X + Y
-//    X & Y
-//
+//	X + Y
+//	X & Y
 type BinaryExpr struct {
 	Src *ast.BinaryExpr
 	Op  Op
@@ -1169,8 +1171,9 @@ func (x *BinaryExpr) Source() ast.Node {
 func (x *BinaryExpr) evaluate(c *OpContext) Value {
 	env := c.Env(0)
 	if x.Op == AndOp {
-		// Anonymous Arc
-		v := &Vertex{Conjuncts: []Conjunct{{env, x, CloseInfo{}}}}
+		v := &Vertex{Conjuncts: []Conjunct{
+			makeAnonymousConjunct(env, x, c.ci.Refs),
+		}}
 		c.Unify(v, Finalized)
 		return v
 	}
@@ -1208,9 +1211,6 @@ func (x *BinaryExpr) evaluate(c *OpContext) Value {
 
 func (c *OpContext) validate(env *Environment, src ast.Node, x Expr, op Op) (r Value) {
 	s := c.PushState(env, src)
-	if c.nonMonotonicLookupNest == 0 {
-		c.nonMonotonicGeneration++
-	}
 
 	var match bool
 	// NOTE: using Unwrap is maybe note entirely accurate, as it may discard
@@ -1219,19 +1219,29 @@ func (c *OpContext) validate(env *Environment, src ast.Node, x Expr, op Op) (r V
 	switch b := c.value(x).(type) {
 	case nil:
 	case *Bottom:
-		if b.Code == CycleError {
+		switch b.Code {
+		case CycleError:
 			c.PopState(s)
 			c.AddBottom(b)
+			// TODO: add this. This erases some
+			// c.verifyNonMonotonicResult(env, x, true)
 			return nil
+
+		case IncompleteError:
+			c.evalState(x, Finalized)
+
+			// We have a nonmonotonic use of a failure. Referenced fields should
+			// not be added anymore.
+			c.verifyNonMonotonicResult(env, x, true)
 		}
+
 		match = op == EqualOp
-		// We have a nonmonotonic use of a failure. Referenced fields should
-		// not be added anymore.
-		c.nonMonotonicRejectNest++
-		c.evalState(x, Partial)
-		c.nonMonotonicRejectNest--
 
 	default:
+		v, ok := b.(*Vertex)
+		isVoid := ok && !v.isDefined()
+		c.verifyNonMonotonicResult(env, x, isVoid)
+
 		// TODO(cycle): if EqualOp:
 		// - ensure to pass special status to if clause or keep a track of "hot"
 		//   paths.
@@ -1240,7 +1250,7 @@ func (c *OpContext) validate(env *Environment, src ast.Node, x Expr, op Op) (r V
 		//   previously marked fields.
 		//
 		switch {
-		case b.Concreteness() > Concrete:
+		case b.Concreteness() > Concrete, isVoid:
 			// TODO: mimic comparison to bottom semantics. If it is a valid
 			// value, check for concreteness that this level only. This
 			// should ultimately be replaced with an exists and valid
@@ -1249,20 +1259,32 @@ func (c *OpContext) validate(env *Environment, src ast.Node, x Expr, op Op) (r V
 		default:
 			match = op != EqualOp
 		}
-		c.nonMonotonicLookupNest++
 		c.evalState(x, Partial)
-		c.nonMonotonicLookupNest--
 	}
 
 	c.PopState(s)
 	return &Bool{src, match}
 }
 
+// verifyNonMonotonicResult re-evaluates the given expression at a later point
+// to ensure that the result has not changed. This is relevant when a function
+// uses reflection, as in `if a != _|_`, where the result of an evaluation may
+// change after the fact.
+// expectError indicates whether the value should evaluate to an error or not.
+func (c *OpContext) verifyNonMonotonicResult(env *Environment, x Expr, expectError bool) {
+	if n := env.Vertex.getNodeContext(c, 0); n != nil {
+		n.postChecks = append(n.postChecks, envCheck{
+			env:         env,
+			expr:        x,
+			expectError: expectError,
+		})
+	}
+}
+
 // A CallExpr represents a call to a builtin.
 //
-//    len(x)
-//    strings.ToLower(x)
-//
+//	len(x)
+//	strings.ToLower(x)
 type CallExpr struct {
 	Src  *ast.CallExpr
 	Fun  Expr
@@ -1439,7 +1461,7 @@ func (x *Builtin) call(c *OpContext, p token.Pos, args []Value) Expr {
 		if _, ok := v.(*BasicType); !ok {
 			env := c.Env(0)
 			x := &BinaryExpr{Op: AndOp, X: v, Y: a}
-			n := &Vertex{Conjuncts: []Conjunct{{env, x, CloseInfo{}}}}
+			n := &Vertex{Conjuncts: []Conjunct{{env, x, c.ci}}}
 			c.Unify(n, Finalized)
 			if _, ok := n.BaseValue.(*Bottom); ok {
 				c.addErrf(0, pos(a),
@@ -1458,8 +1480,7 @@ func (x *Builtin) Source() ast.Node { return nil }
 // A BuiltinValidator is a Value that results from evaluation a partial call
 // to a builtin (using CallExpr).
 //
-//    strings.MinRunes(4)
-//
+//	strings.MinRunes(4)
 type BuiltinValidator struct {
 	Src     *CallExpr
 	Builtin *Builtin
@@ -1564,7 +1585,7 @@ func (x *DisjunctionExpr) Source() ast.Node {
 
 func (x *DisjunctionExpr) evaluate(c *OpContext) Value {
 	e := c.Env(0)
-	v := &Vertex{Conjuncts: []Conjunct{{e, x, CloseInfo{}}}}
+	v := &Vertex{Conjuncts: []Conjunct{{e, x, c.ci}}}
 	c.Unify(v, Finalized) // TODO: also partial okay?
 	// TODO: if the disjunction result originated from a literal value, we may
 	// consider the result closed to create more permanent errors.
@@ -1614,7 +1635,32 @@ func (x *Disjunction) Kind() Kind {
 
 type Comprehension struct {
 	Clauses Yielder
-	Value   Expr
+
+	// Value can be either a StructLit if this is a compiled expression or
+	// a Field if this is a computed Comprehension. Value holds a Field,
+	// rather than an Expr, in the latter case to preserve as much position
+	// information as possible.
+	Value Node
+
+	// Only used for partial comprehensions.
+	comp   *envComprehension
+	parent *Comprehension // comprehension from which this one was derived, if any
+	arc    *Vertex        // arc to which this comprehension was added.
+}
+
+// Nest returns the nesting level of void arcs of this comprehension.
+func (c *Comprehension) Nest() int {
+	count := 0
+	for ; c.parent != nil; c = c.parent {
+		count++
+	}
+	return count
+}
+
+// DidResolve reports whether a comprehension was processed and resulted in at
+// least one yielded value.
+func (x *Comprehension) DidResolve() bool {
+	return x.comp.done && len(x.comp.envs) > 0
 }
 
 func (x *Comprehension) Source() ast.Node {
@@ -1627,8 +1673,7 @@ func (x *Comprehension) Source() ast.Node {
 // A ForClause represents a for clause of a comprehension. It can be used
 // as a struct or list element.
 //
-//    for k, v in src {}
-//
+//	for k, v in src {}
 type ForClause struct {
 	Syntax *ast.ForClause
 	Key    Feature
@@ -1653,7 +1698,10 @@ func (x *ForClause) yield(c *OpContext, f YieldFunc) {
 
 		c.Unify(a, Partial)
 
-		n := &Vertex{status: Finalized}
+		n := &Vertex{
+			Parent: c.Env(0).Vertex,
+			status: Finalized,
+		}
 
 		if x.Value != InvalidLabel {
 			b := &Vertex{
@@ -1687,8 +1735,7 @@ func (x *ForClause) yield(c *OpContext, f YieldFunc) {
 // An IfClause represents an if clause of a comprehension. It can be used
 // as a struct or list element.
 //
-//    if cond {}
-//
+//	if cond {}
 type IfClause struct {
 	Src       *ast.IfClause
 	Condition Expr
@@ -1710,8 +1757,7 @@ func (x *IfClause) yield(ctx *OpContext, f YieldFunc) {
 
 // An LetClause represents a let clause in a comprehension.
 //
-//    let x = y
-//
+//	let x = y
 type LetClause struct {
 	Src   *ast.LetClause
 	Label Feature
@@ -1728,7 +1774,7 @@ func (x *LetClause) Source() ast.Node {
 
 func (x *LetClause) yield(c *OpContext, f YieldFunc) {
 	n := &Vertex{Arcs: []*Vertex{
-		{Label: x.Label, Conjuncts: []Conjunct{{c.Env(0), x.Expr, CloseInfo{}}}},
+		{Label: x.Label, Conjuncts: []Conjunct{{c.Env(0), x.Expr, c.ci}}},
 	}}
 
 	sub := c.spawn(n)
